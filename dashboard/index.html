@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b0f14">
+<meta name="robots" content="noindex,nofollow">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Dashboard">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="app-icon.svg" type="image/svg+xml">
+<title>Brandit Media Dashboard</title>
+<style>
+:root{color-scheme:dark;--bg:#0b0f14;--card:#121821;--line:#223041;--txt:#e6edf5;--mute:#8a9bb0;--ok:#34d399;--warn:#f59e0b;--bad:#ef4444;--acc:#3b82f6}
+*{box-sizing:border-box}html,body{margin:0;background:var(--bg);color:var(--txt);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif}
+header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:max(14px,env(safe-area-inset-top)) 16px 10px}
+h1{font-size:22px;margin:0}.sub{color:var(--mute);font-size:12px}
+button{appearance:none;border:1px solid var(--line);background:#18212d;color:var(--txt);border-radius:10px;padding:9px 14px;font-size:14px;font-weight:600;cursor:pointer}
+button.primary{background:var(--acc);border-color:var(--acc);color:#fff}
+#banner{display:none;margin:0 16px 10px;padding:12px 14px;border-radius:12px;background:var(--bad);color:#fff;font-weight:700}
+main{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px;padding:0 16px 16px}
+.tile{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;min-width:0}
+.tile h2{margin:0 0 4px;font-size:18px;display:flex;align-items:center;gap:8px}
+.dot{width:12px;height:12px;border-radius:50%;background:var(--mute);display:inline-block}
+.dot.ok{background:var(--ok)}.dot.warn{background:var(--warn)}.dot.bad{background:var(--bad)}
+.state{font-size:28px;font-weight:800;margin:10px 0 2px}
+.metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-top:12px}
+.m{background:#0e141c;border:1px solid var(--line);border-radius:12px;padding:10px}
+.m .v{font-size:24px;font-weight:800;font-variant-numeric:tabular-nums}.m .l{font-size:12px;color:var(--mute)}
+.issues{list-style:none;padding:0;margin:12px 0 0}.issues li{padding:8px 10px;border-radius:10px;margin-top:6px;font-size:14px}
+.issues .critical{background:#3b1416;border:1px solid var(--bad)}.issues .warning{background:#3a2a0c;border:1px solid var(--warn)}
+.tabs{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}.tabs button{padding:6px 10px;font-size:13px}.tabs button.on{background:var(--acc);border-color:var(--acc)}
+svg.spark{width:100%;height:60px;margin-top:10px}
+.foot{color:var(--mute);font-size:12px;margin-top:10px}
+dialog{background:var(--card);color:var(--txt);border:1px solid var(--line);border-radius:16px;max-width:460px;width:calc(100% - 32px)}
+dialog::backdrop{background:#000a}label{display:block;font-size:13px;color:var(--mute);margin:12px 0 4px}
+input{width:100%;padding:10px;border-radius:10px;border:1px solid var(--line);background:#0e141c;color:var(--txt);font-size:15px}
+.code{font-size:34px;font-weight:800;letter-spacing:4px;text-align:center;margin:12px 0}
+.row{display:flex;gap:8px;justify-content:flex-end;margin-top:14px;flex-wrap:wrap}
+</style>
+</head>
+<body>
+<header>
+  <div><h1>Brandit Media Dashboard</h1><div class="sub" id="updated">Starting…</div></div>
+  <div><button id="refreshBtn">Refresh</button> <button id="setupBtn">Setup</button></div>
+</header>
+<div id="banner"></div>
+<main>
+  <section class="tile" id="cmsTile">
+    <h2><span class="dot" id="cmsDot"></span> CMS monitor</h2>
+    <div class="sub" id="cmsAddr"></div>
+    <div class="state" id="cmsState">Checking…</div>
+    <div class="sub" id="cmsDetail"></div>
+    <div class="metrics" id="cmsMetrics"></div>
+    <svg class="spark" id="cmsSpark" viewBox="0 0 300 60" preserveAspectRatio="none"></svg>
+    <ul class="issues" id="cmsIssues"></ul>
+  </section>
+  <section class="tile" id="licTile">
+    <h2><span class="dot" id="licDot"></span> Licensing monitor</h2>
+    <div class="sub">Licences, trials and payments from the CMS licence server</div>
+    <div class="tabs" id="licTabs"></div>
+    <div class="state" id="licState">Checking…</div>
+    <div class="sub" id="licDetail"></div>
+    <div class="metrics" id="licMetrics"></div>
+    <ul class="issues" id="licIssues"></ul>
+  </section>
+</main>
+
+<dialog id="setup">
+  <h2 style="margin-top:0">Setup</h2>
+  <label for="baseIn">CMS address</label>
+  <input id="baseIn" inputmode="url" autocomplete="off">
+  <label for="nameIn">Name for this screen</label>
+  <input id="nameIn" autocomplete="off">
+  <p class="sub" id="pairState"></p>
+  <div id="pairBox" style="display:none">
+    <p>On the CMS, open <b>Licensing &gt; Office monitors</b> and approve this code:</p>
+    <div class="code" id="pairCode"></div>
+  </div>
+  <div class="row">
+    <button id="unpairBtn">Forget pairing</button>
+    <button id="pairBtn" class="primary">Pair with CMS</button>
+    <button id="closeBtn">Done</button>
+  </div>
+</dialog>
+
+<script>
+(()=>{
+const DEFAULT_BASE='https://cms.103-85-28-58.sslip.io';
+const PRODUCTS=[['radio','Radio Juicebox'],['video','Video Juicebox'],['remote','Juicebox Remote']];
+const POLL_MS=60000;
+const $=id=>document.getElementById(id);
+// Settings live only in this browser (never in the website code).
+const store={get(k,d){try{const v=localStorage.getItem('bmdash.'+k);return v===null?d:v}catch(e){return d}},
+  set(k,v){try{v===null?localStorage.removeItem('bmdash.'+k):localStorage.setItem('bmdash.'+k,v)}catch(e){}}};
+const base=()=>store.get('base',DEFAULT_BASE).replace(/\/+$/,'');
+const token=()=>store.get('token','');
+let deviceId=store.get('deviceId','');if(!deviceId){deviceId=(crypto.randomUUID?crypto.randomUUID():String(Date.now())+Math.random());store.set('deviceId',deviceId)}
+let product=store.get('product','radio');
+let failCount=0,history=[];
+try{history=JSON.parse(store.get('history','[]'))}catch(e){history=[]}
+
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const money=(n,c)=>{try{return new Intl.NumberFormat('en-NZ',{style:'currency',currency:c||'NZD'}).format(n)}catch(e){return '$'+Number(n).toFixed(2)}};
+const timeNow=()=>new Date().toLocaleTimeString('en-NZ',{hour:'2-digit',minute:'2-digit'});
+
+async function timed(url,opts={}){
+  const ctrl=new AbortController();const t=setTimeout(()=>ctrl.abort(),15000);const t0=performance.now();
+  try{const r=await fetch(url,{...opts,signal:ctrl.signal,cache:'no-store'});return {r,ms:Math.round(performance.now()-t0)}}
+  finally{clearTimeout(t)}
+}
+async function getStats(p){
+  const q=p?('?product='+encodeURIComponent(p)):'';
+  const {r,ms}=await timed(base()+'/api/v1/monitor/stats'+q,{headers:{Authorization:'Bearer '+token()}});
+  if(r.status===401){const e=new Error('not_paired');e.code=401;throw e}
+  if(!r.ok)throw new Error('HTTP '+r.status);
+  return {data:await r.json(),ms};
+}
+// Without a pairing we can still tell if the CMS answers at all (opaque request, no data read).
+async function ping(){const {ms}=await timed(base()+'/',{mode:'no-cors'});return ms}
+
+function setDot(id,cls){$(id).className='dot '+(cls||'')}
+function renderMetrics(el,list){el.innerHTML=(list||[]).map(m=>`<div class="m"><div class="v">${esc(m.value)}</div><div class="l">${esc(m.label)}</div></div>`).join('')}
+function renderIssues(el,list){el.innerHTML=(list||[]).map(i=>`<li class="${i.severity==='critical'?'critical':'warning'}">${esc(i.message)}</li>`).join('')}
+function spark(){
+  const pts=history.slice(-60);const svg=$('cmsSpark');
+  if(pts.length<2){svg.innerHTML='';return}
+  const max=Math.max(...pts.map(p=>p.ms||0),200);
+  const d=pts.map((p,i)=>{const x=i*(300/(pts.length-1));const y=p.up?58-(p.ms/max)*54:58;return (i?'L':'M')+x.toFixed(1)+' '+y.toFixed(1)}).join(' ');
+  svg.innerHTML=`<path d="${d}" fill="none" stroke="#34d399" stroke-width="2"/>`+
+    pts.map((p,i)=>p.up?'':`<circle cx="${(i*(300/(pts.length-1))).toFixed(1)}" cy="56" r="3" fill="#ef4444"/>`).join('');
+}
+function record(up,ms){history.push({t:Date.now(),up,ms:ms||0});history=history.filter(p=>Date.now()-p.t<86400000).slice(-1440);store.set('history',JSON.stringify(history))}
+
+function renderTabs(){
+  $('licTabs').innerHTML=PRODUCTS.map(([k,l])=>`<button data-p="${k}" class="${k===product?'on':''}">${l}</button>`).join('');
+  $('licTabs').querySelectorAll('button').forEach(b=>b.onclick=()=>{product=b.dataset.p;store.set('product',product);renderTabs();checkLicensing()});
+}
+
+let critical={cms:[],lic:[]};
+function banner(){
+  const all=[...critical.cms,...critical.lic];
+  $('banner').style.display=all.length?'block':'none';
+  $('banner').textContent=all.join('  •  ');
+}
+
+async function checkCms(){
+  $('cmsAddr').textContent=base();
+  critical.cms=[];
+  if(!token()){
+    try{const ms=await ping();failCount=0;record(true,ms);setDot('cmsDot','warn');
+      $('cmsState').textContent='Online';$('cmsDetail').textContent=`Answered in ${ms} ms. Press Setup and pair to see full stats.`;}
+    catch(e){fail('No answer from the CMS')}
+    $('cmsMetrics').innerHTML='';$('cmsIssues').innerHTML='';spark();banner();return;
+  }
+  try{
+    const {data,ms}=await getStats();failCount=0;record(true,ms);
+    const issues=(data.issues||[]).filter(i=>i.area!=='licensing');
+    const crit=issues.filter(i=>i.severity==='critical');
+    setDot('cmsDot',crit.length?'bad':issues.length?'warn':'ok');
+    $('cmsState').textContent=crit.length?'Problem':'Online';
+    $('cmsDetail').textContent=`Answered in ${ms} ms · ${data.title||data.source||'CMS'}`;
+    renderMetrics($('cmsMetrics'),[{label:'Response time',value:ms+' ms'},{label:'Up (last 24h)',value:uptime()}]);
+    renderIssues($('cmsIssues'),issues);critical.cms=crit.map(i=>i.message);
+  }catch(e){
+    if(e.code===401){setDot('cmsDot','warn');$('cmsState').textContent='Pairing removed';$('cmsDetail').textContent='Press Setup to pair again.';}
+    else fail(e.name==='AbortError'?'CMS took too long to answer':'Could not read the CMS ('+e.message+')');
+  }
+  spark();banner();
+}
+function uptime(){if(!history.length)return '–';return Math.round(100*history.filter(p=>p.up).length/history.length)+'%'}
+function fail(msg){
+  failCount++;record(false,0);setDot('cmsDot','bad');
+  $('cmsState').textContent='Offline';$('cmsDetail').textContent=msg;
+  if(failCount>=3)critical.cms=['CMS is not answering ('+base()+')'];
+}
+
+async function checkLicensing(){
+  critical.lic=[];
+  if(!token()){setDot('licDot','');$('licState').textContent='Not paired';$('licDetail').textContent='Press Setup and pair this screen with the CMS.';
+    $('licMetrics').innerHTML='';$('licIssues').innerHTML='';banner();return}
+  try{
+    const {data}=await getStats(product);
+    const issues=(data.issues||[]).filter(i=>i.area==='licensing'||i.area==='software');
+    const crit=issues.filter(i=>i.severity==='critical');
+    setDot('licDot',crit.length?'bad':issues.length?'warn':'ok');
+    $('licState').textContent=data.title||PRODUCTS.find(p=>p[0]===product)[1];
+    const m=[...(data.metrics||[])];
+    if(data.revenue){m.push({label:'Collected this month',value:money(data.revenue.month,data.currency)},{label:'Collected this year',value:money(data.revenue.year,data.currency)})}
+    renderMetrics($('licMetrics'),m);
+    $('licDetail').textContent=issues.length?'':'All licences look fine.';
+    renderIssues($('licIssues'),issues);critical.lic=crit.map(i=>i.message);
+  }catch(e){
+    setDot('licDot','bad');$('licState').textContent=e.code===401?'Pairing removed':'Unavailable';
+    $('licDetail').textContent=e.code===401?'Press Setup to pair again.':'Licensing stats could not be read ('+(e.message||'error')+').';
+    $('licMetrics').innerHTML='';$('licIssues').innerHTML='';
+  }
+  banner();
+}
+
+async function refresh(){await Promise.all([checkCms(),checkLicensing()]);$('updated').textContent='Last checked '+timeNow()+' · checks every minute'}
+
+// ---- Setup and pairing (Office Monitor protocol v1) ----
+let pairTimer=null;
+function openSetup(){$('baseIn').value=base();$('nameIn').value=store.get('name','Brandit dashboard');
+  $('pairState').textContent=token()?'This screen is paired with the CMS.':'This screen is not paired yet.';$('pairBox').style.display='none';$('setup').showModal()}
+function saveSetup(){const b=$('baseIn').value.trim();if(b)store.set('base',b);store.set('name',$('nameIn').value.trim()||'Brandit dashboard')}
+async function pair(){
+  saveSetup();clearInterval(pairTimer);$('pairState').textContent='Asking the CMS for a code…';
+  try{
+    const r=await fetch(base()+'/api/v1/monitor/pair/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({deviceName:store.get('name','Brandit dashboard'),deviceId})});
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    const j=await r.json();$('pairCode').textContent=j.code;$('pairBox').style.display='block';$('pairState').textContent='Waiting for approval…';
+    pairTimer=setInterval(async()=>{
+      try{const p=await fetch(base()+'/api/v1/monitor/pair/poll',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pairingId:j.pairingId})});
+        const s=await p.json();
+        if(s.status==='approved'&&s.token){clearInterval(pairTimer);store.set('token',s.token);$('pairBox').style.display='none';$('pairState').textContent='Paired. You can press Done.';refresh()}
+        else if(s.status==='denied'||s.status==='expired'){clearInterval(pairTimer);$('pairBox').style.display='none';$('pairState').textContent='Pairing was '+s.status+'. Press Pair to try again.'}
+      }catch(e){}
+    },5000);
+  }catch(e){$('pairState').textContent='Could not reach the CMS to pair ('+e.message+'). If this keeps happening, the CMS may need to allow this website to call it.'}
+}
+$('setupBtn').onclick=openSetup;$('refreshBtn').onclick=refresh;$('pairBtn').onclick=pair;
+$('unpairBtn').onclick=()=>{store.set('token',null);$('pairState').textContent='Pairing forgotten on this screen. Also press Remove on the CMS.';refresh()};
+$('closeBtn').onclick=()=>{saveSetup();clearInterval(pairTimer);$('setup').close();refresh()};
+
+renderTabs();refresh();setInterval(refresh,POLL_MS);
+if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js').catch(()=>{})}
+})();
+</script>
+</body>
+</html>
